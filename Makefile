@@ -6,7 +6,7 @@ CC=$(CROSS_COMPILER)bin/i386-pc-nto-qnx-gcc
 INCLUDE_PATHS=-I./include -I./include/osal -I./include/qnx
 LIB_PATH=./lib/qnx
 #################################################
-# makefile for ethercat TCS-NG Drivers		#
+# makefile for ethercat TCS-NG Driver		#
 ################directories######################
 
 SIMPLE-OBJS = simple_test.o

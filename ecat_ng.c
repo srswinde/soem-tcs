@@ -44,19 +44,62 @@ volatile int wkc;
 boolean inOP;
 uint8 currentgroup = 0;
 
-struct PosOut { //0x1600
+#define CTRL_DEAD   		0
+#define CTRL_SHUTDOWN   	6
+#define CTRL_SWITCH_ON		7
+#define CTRL_SWITCH_ON_ENABLE_OP 15
+#define CTRL_HALT		128
+typedef struct
+{
+unsigned short switchOn: 1;
+unsigned short enableVoltage: 1;
+unsigned short quickStop: 1;
+unsigned short enableOperation: 1;
+unsigned short homeOperationStop: 1;
+unsigned short oms1: 2;
+unsigned short faultReset: 1;
+unsigned short halt: 1;
+unsigned short oms2: 1;
+unsigned short reserved1: 1;
+unsigned short reserved2: 5;
+} ecat_controlword;
+
+
+#define STAT_NOT_READY 		0  //& statusword with 79
+#define STAT_SWITCH_ON_DISABLED 64 //& with statusword 79
+#define STAT_RDY_TO_SWITCH_ON 	33 //& with statusword 111
+#define STAT_SWITCHED_ON	35 //& with statusword 111
+#define STAT_OP_ENABLED 	39 //& with statusword 111
+#define STAT_QUICK_STOP_ACTIVE	7  //& with statusword 111
+#define STAT_FAULT_REACT_ACTIVE 15 //& with statusword 79
+#define STAT_FAULT		8  //& with statusword 79
+#define STAT_ALL_READY		567//& with statusword 0xfff
+typedef struct
+{
+unsigned short readyToSwitchOn: 1;
+unsigned short SwitchedOn: 1;
+unsigned short OperationEnabled: 1;
+unsigned short fault: 1;
+unsigned short voltageEnabled: 1;
+unsigned short quickStop: 1;
+unsigned short SwitchOnDisabled: 1;
+unsigned short warning: 1;
+unsigned short oms1: 1;
+unsigned short remote: 1;
+unsigned short targetReached: 1;
+unsigned short internalLimitActive: 1;
+unsigned short homingAttained: 1;
+unsigned short ms: 3;
+} ecat_statusword;
+
+struct PosOut { //0x1600 -- cyclic position rxpdo
     uint32 pos;
     uint32 dio;
     uint16 control;
 };
 
-struct VelocOut { //0x1601
+struct VelocOut { //0x1601 -- cyclic velocity rxpdo
     uint32 veloc;
-    uint16 control;
-};
-
-struct TorqueOut {  //0x1602
-    uint16 torque;
     uint16 control;
 };
 
@@ -76,12 +119,51 @@ struct PosTrqVelIn {  //0x1A02  --  not useful
     int8 profile;
 };
 
-struct PosVelDioIn {  //0x1A03
+struct PosVelDioIn {  //0x1A03 -- velovity AND position mode txpdo
     int32 position;
     uint32 dio;
     int32 velocity;
     uint16 status;
 };
+
+
+typedef struct
+{
+unsigned short switchOn: 1;
+unsigned short enableVoltage: 1;
+unsigned short quickStop: 1;
+unsigned short enableOperation: 1;
+unsigned short homeOperationStop: 1;
+unsigned short oms1: 2;
+unsigned short faultReset: 1;
+unsigned short halt: 1;
+unsigned short oms2: 1;
+unsigned short reserved1: 1;
+unsigned short reserved2: 5;
+} controlword;
+
+
+typedef struct
+{
+unsigned short readyToSwitchOn: 1;
+unsigned short SwitchedOn: 1;
+unsigned short OperationEnabled: 1;
+unsigned short fault: 1;
+unsigned short voltageEnabled: 1;
+unsigned short quickStop: 1;
+unsigned short SwitchOnDisabled: 1;
+unsigned short warning: 1;
+unsigned short oms1: 1;
+unsigned short remote: 1;
+unsigned short targetReached: 1;
+unsigned short internalLimitActive: 1;
+unsigned short homingAttained: 1;
+unsigned short ms: 3;
+} statusword;
+
+
+int reachedInitial;
+
 
 
 /*############################################################################
@@ -406,12 +488,12 @@ inOP = FALSE;
 uint32 buf32;
 uint16 buf16;
 uint8 buf8;
+uint16 ctrl_macro, stat_macro;
 
 //struct PosTrqVelIn *val;
 struct PosVelDioIn *val;
 struct VelocOut *target;
 
-int reachedInitial = 0;
 int timestep = 700;
 
 target = (struct VelocOut *)(ec_slave[1].outputs);
@@ -425,48 +507,51 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 
 	if(wkc >= expectedWKC)
 		{
+		ctrl_macro=(uint16) target->control;
+		stat_macro=(uint16) val->status;
+		
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
-		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
-
+		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, stat_macro);
+		
 		/** if in fault or in the way to normal status, we update the state machine */
-		switch(target->control)
+		switch(ctrl_macro)
 			{
-			case 0:
-				target->control = 6;
+			case CTRL_DEAD:
+				ctrl_macro = CTRL_SHUTDOWN;
 				break;
-			case 6:
-				target->control = 7;
+			case CTRL_SHUTDOWN:
+				ctrl_macro = CTRL_SWITCH_ON;
 				break;
-			case 7:
-				target->control = 15;
+			case CTRL_SWITCH_ON:
+				ctrl_macro = CTRL_SWITCH_ON_ENABLE_OP;
 				break;
-			case 128:
-				target->control = 0;
+			case CTRL_HALT:
+				ctrl_macro = CTRL_DEAD;
 				break;
 			default:
-				if(val->status >> 3 & 0x01){
+				if(stat_macro >> 3 & 0x01){
 					READ(0x1001, 0, buf8, "Error");
-					target->control = 128;
+					ctrl_macro = 128;
                             		}
 //                            break;
                         }
 
 
 		/** we wait to be in ready-to-run mode and with initial value reached */
-		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (stat_macro & 0x0fff) == STAT_ALL_READY)
 			{
-			printf("!!!!!!!!!!!!!!!!!!!!!HERE!!!!!!!!!!!!!!!!!!!!!");
 			reachedInitial = 1;
 			}
 
-		if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+		if((stat_macro & 0x0fff) == STAT_ALL_READY && reachedInitial)
 			{
-			//target->veloc = (int32) (sin(i/100.)*(1000));
 			target->veloc = (int32) targVel;
 			}
 
-		printf("  Target: 0x%li, Control: 0x%li\n", target->veloc, target->control);
+		printf("  Target: %li, Control: %li\n", target->veloc, ctrl_macro);
+		memcpy(&val->status, &stat_macro, 2);
+		memcpy(&target->control, &ctrl_macro, 2);
 
 		printf("\r");
 		needlf = TRUE;
@@ -490,12 +575,12 @@ inOP = FALSE;
 uint32 buf32;
 uint16 buf16;
 uint8 buf8;
+uint16 ctrl_macro, stat_macro;
 
 //struct PosTrqVelIn *val;
 struct PosVelDioIn *val;
 struct PosOut *target;
 
-int reachedInitial = 0;
 int timestep = 700;
 
 target = (struct PosOut *)(ec_slave[1].outputs);
@@ -509,48 +594,53 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 
 	if(wkc >= expectedWKC)
 		{
+		ctrl_macro=(uint16) target->control;
+		stat_macro=(uint16) val->status;
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
-
+		
 		/** if in fault or in the way to normal status, we update the state machine */
-		switch(target->control)
+		switch(ctrl_macro)
 			{
-			case 0:
-				target->control = 6;
+			case CTRL_DEAD:
+				ctrl_macro = CTRL_SHUTDOWN;
 				break;
-			case 6:
-				target->control = 7;
+			case CTRL_SHUTDOWN:
+				ctrl_macro = CTRL_SWITCH_ON;
 				break;
-			case 7:
-				target->control = 15;
+			case CTRL_SWITCH_ON:
+				ctrl_macro = CTRL_SWITCH_ON_ENABLE_OP;
 				break;
-			case 128:
-				target->control = 0;
+			case CTRL_HALT:
+				ctrl_macro = CTRL_DEAD;
 				break;
 			default:
-				if(val->status >> 3 & 0x01){
+				if(stat_macro >> 3 & 0x01){
 					READ(0x1001, 0, buf8, "Error");
-					target->control = (128);
-					}
-				
+					ctrl_macro = 128;
+                            		}
 //                            break;
                         }
 
 
 		/** we wait to be in ready-to-run mode and with initial value reached */
-		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (stat_macro & 0x0fff) == STAT_ALL_READY)
 			{
 			reachedInitial = 1;
-			printf("!!!!!!!!!!HERE!!!!!!!!!\n");
+			target->pos = val->position;
 			}
 
-		//else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+		if((stat_macro & 0x0fff) == STAT_ALL_READY && reachedInitial)
 		//if((val->status & 0x0fff) == 0x0237)
-		//	{
+			{
 			target->pos = (int32) targPos;
-		//	}
+			}
 
-		printf("  Target: 0x%li, Control: 0x%li\n", target->pos, target->control);
+		printf("  Target: %li, Control: %li\n", target->pos, target->control);
+
+		
+		memcpy(&val->status, &stat_macro, 2);
+		memcpy(&target->control, &ctrl_macro, 2);
 
 		printf("\r");
 		needlf = TRUE;
@@ -662,11 +752,13 @@ int main(int argc, char *argv[])
       /* start cyclic part */
       
       initEcat(argv[1], mode);
+	reachedInitial = 0;
+
 	for(i = 1; i <= 100000; i++)
                 {
 		ecatErr();
 		if(mode == VEL_MOD){commandVel(100000);}
-		if(mode == POS_MOD){commandPos(367323677);}
+		if(mode == POS_MOD){commandPos(28863716);}
 		usleep(1000);
 
                 }
