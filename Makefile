@@ -1,8 +1,8 @@
-#CROSS_COMPILER=/usr/local/gcc-cross/
-#CC=$(CROSS_COMPILER)bin/i386-pc-nto-qnx-gcc
+CROSS_COMPILER=/usr/local/gcc-cross/
+CC=$(CROSS_COMPILER)bin/i386-pc-nto-qnx-gcc
 #C_INCLUDE_PATH=$(CROSS_COMPILER)i386-pc-nto-qnx/include
 #LD_LIBRARY_PATH=$(CROSS_COMPILER)i386-pc-nto-qnx/lib
-CC=qcc -V gcc_ntox86
+#CC=qcc -V gcc_ntox86
 INCLUDE_PATHS=-I./include -I./include/osal -I./include/qnx
 LIB_PATH=./lib/qnx
 #################################################
@@ -18,7 +18,7 @@ TEST_VELOC-OBJS = simple_test_veloc.o
 
 ###############binaries####################
 
-all: simple_test ecat_elmo elmo_test simple_test_veloc
+all: simple_test_veloc
 
 ecat_copley: $(COPLEY-OBJS)
 	$(CC) $^ -o  ecat_copley -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
@@ -62,5 +62,5 @@ simple_test_veloc: $(TEST_VELOC-OBJS)
 
 ###############utils#######################
 clean: \
-;rm *.o simple_test ecat_copley ecat_elmo elmo_test
+;rm *.o simple_test_veloc
 

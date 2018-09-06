@@ -1,6 +1,12 @@
-/** 
- *  (c) 2014, Manuel Vonthron - OPAL-RT Technologies, inc.
- */
+/*############################################################################
+#  Title: soemEcat.c
+#  Author: C. Johnson / S. Swindell
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: this is largely a hack of simpletest.c from the SOEM website.
+# 	This will eventually be the soem driver for TCS
+#
+#############################################################################*/
 
 #include <stdio.h>
 #include <string.h>
@@ -22,7 +28,13 @@
 
 #define EC_TIMEOUTMON 500
 
-#define INITIAL_POS 0
+#define INITIAL_POS 342592238
+
+#define VEL_MOD 0
+#define POS_MOD 1
+
+#define OK 0
+#define NOK 1
 
 char IOmap[4096];
 pthread_t thread1;
@@ -32,64 +44,113 @@ volatile int wkc;
 boolean inOP;
 uint8 currentgroup = 0;
 
-struct VelocOut
-{
+struct PosOut { //0x1600
+    uint32 pos;
+    uint32 dio;
+    uint16 control;
+};
 
+struct VelocOut { //0x1601
     uint32 veloc;
-    uint16 status;
-
-
+    uint16 control;
 };
 
-struct TorqueOut {
+struct TorqueOut {  //0x1602
     uint16 torque;
-    uint16 status;
+    uint16 control;
 };
 
-struct TorqueIn {
+struct PVTOut { //0x1606
+    uint32 pos;
+    uint32 dio;
+    uint32 veloc;
+    uint32 voffset;
+    uint16 toffset;
+    uint16 control;
+};
+
+struct PosTrqVelIn {  //0x1A02  --  not useful
     int32 position;
     int16 torque;
     uint16 status;
     int8 profile;
 };
 
-/**
- * helper macros
- */
-#define READ(idx, sub, buf, comment)    \
-    {   \
-        buf=0;  \
-        int __s = sizeof(buf);    \
-        int __ret = ec_SDOread(1, idx, sub, FALSE, &__s, &buf, EC_TIMEOUTRXM);   \
-        printf("Read at 0x%04x:%d => wkc: %d; data: 0x%.*x (%d)\t[%s]\n", idx, sub, __ret, __s, (unsigned int)buf, (unsigned int)buf, comment);    \
+struct PosVelDioIn {  //0x1A03
+    int32 position;
+    uint32 dio;
+    int32 velocity;
+    uint16 status;
+};
+
+
+/*############################################################################
+#  Title: ecatRead()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: variable precision ethercat read function
+#
+#############################################################################*/
+int READ(idx, sub, buf, comment)
+    {
+        buf=0;
+        int __s = sizeof(buf);
+        int __ret = ec_SDOread(1, idx, sub, FALSE, &__s, &buf, EC_TIMEOUTRXM);
+        printf("Read at 0x%04x:%d => wkc: %d; data: 0x%.*x (%d)\t[%s]\n", idx, sub, __ret, __s, (unsigned int)buf, (unsigned int)buf, comment);
      }
 
-#define WRITE(idx, sub, buf, value, comment) \
-    {   \
-        int __s = sizeof(buf);  \
-        buf = value;    \
-        int __ret = ec_SDOwrite(1, idx, sub, FALSE, __s, &buf, EC_TIMEOUTRXM);  \
-        printf("Write at 0x%04x:%d => wkc: %d; data: 0x%.*x\t{%s}\n", idx, sub, __ret, __s, (unsigned int)buf, comment);    \
+/*############################################################################
+#  Title: ecatWrite()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: variable precision ethercat write function
+#
+#############################################################################*/
+int WRITE(idx, sub, buf, value, comment)
+    {  
+        int __s = sizeof(buf); 
+        buf = value;
+        int __ret = ec_SDOwrite(1, idx, sub, FALSE, __s, &buf, EC_TIMEOUTRXM);
+        printf("Write at 0x%04x:%d => wkc: %d; data: 0x%.*x\t{%s}\n", idx, sub, __ret, __s, (unsigned int)buf, comment);
     }
 
-#define CHECKERROR()   \
-{   \
-    ec_readstate();\
-    printf("EC> \"%s\" %x - %x [%s] \n", (char*)ec_elist2string(), ec_slave[1].state, ec_slave[1].ALstatuscode, (char*)ec_ALstatuscode2string(ec_slave[1].ALstatuscode));    \
+/*############################################################################
+#  Title: ecatErrorChk()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: ethercat error check
+#
+#############################################################################*/
+int CHECKERROR()
+{ 
+    ec_readstate();
+    printf("EC> \"%s\" %x - %x [%s] \n", (char*)ec_elist2string(), ec_slave[1].state, ec_slave[1].ALstatuscode, (char*)ec_ALstatuscode2string(ec_slave[1].ALstatuscode));
 }
 
-
-void simpletest(char *ifname)
+/*############################################################################
+#  Title: initEcat()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: init ethercat.  hacked from simpletest.c
+#
+#############################################################################*/
+int initEcat(char *ifname, int loopmode)
 {
     int i, j, oloop, iloop, wkc_count, chk;
     needlf = FALSE;
     inOP = FALSE;
+    int32 ob2;int os;
+	
 
     uint32 buf32;
     uint16 buf16;
     uint8 buf8;
 
-    struct TorqueIn *val;
+    struct PosTrqVelIn *val;
     struct VelocOut *target;
 
    printf("Starting simple test\n");
@@ -113,31 +174,71 @@ void simpletest(char *ifname)
          ec_statecheck(0, EC_STATE_PRE_OP,  EC_TIMEOUTSTATE);
 
          /** set PDO mapping */
-         /** opMode: 8  => Position profile */
-         //WRITE(0x6060, 0, buf8, 10, "OpMode");
-         WRITE(0x6060, 0, buf8, 9, "OpMode");
-         READ(0x6061, 0, buf8, "OpMode display");
+         /** OpMode: -3  => electronic gearing mode */
+         /** OpMode: -2  => analog velocity mode */
+         /** OpMode: -1  => analog current mode */
+         /** OpMode: 1  => profile position mode */
+         /** OpMode: 3  => profile velocity mode */
+         /** OpMode: 4  => profile torque mode*/
+         /** OpMode: 6  => homing mode */
+         /** OpMode: 7  => interpolated position mode */
+         /** OpMode: 8  => cyclic synchronous position mode */
+         /** OpMode: 9  => cyclic synchronous velocity mode */
+         /** OpMode: 10  => cyclic synchronous torque mode */
+
+	/** rxPdo: 1601  => cyclic synchronous position mode */
+        /** rxPdo: 1602  => cyclic synchronous velocity mode */
+        /** txPdo: 1A01  => cyclic synchronous position mode */
+        /** txPdo: 1A02  => cyclic synchronous velocity mode */
+
+	if(loopmode == VEL_MOD)
+		{ 
+		WRITE(0x6060, 0, buf8, 9, "OpMode");
+         	READ(0x6061, 0, buf8, "OpMode display");
 
 
-         READ(0x1c12, 0, buf32, "rxPDO:0");
-         READ(0x1c13, 0, buf32, "txPDO:0");
+         	READ(0x1c12, 0, buf32, "rxPDO:0");
+         	READ(0x1c13, 0, buf32, "txPDO:0");
 
-         READ(0x1c12, 1, buf32, "rxPDO:1");
-         READ(0x1c13, 1, buf32, "txPDO:1");
+         	READ(0x1c12, 1, buf32, "rxPDO:1");
+         	READ(0x1c13, 1, buf32, "txPDO:1");
 
-//         WRITE(0x1c12, 1, buf16, 0x1601, "rxPDO");
-//         WRITE(0x1c13, 1, buf16, 0x1A01, "txPDO");
 
-        int32 ob2;int os;
-	//Torque
-         //os=sizeof(ob2); ob2 = 0x16020001;
-         //ec_SDOwrite(1,0x1c12,0,TRUE,os,&ob2,EC_TIMEOUTRXM);
-	 //Velocity
-	 os=sizeof(ob2); ob2 = 0x16010001;
-         ec_SDOwrite(1,0x1c12,0,TRUE,os,&ob2,EC_TIMEOUTRXM);
+         	//Velocity
+	 	os=sizeof(ob2); ob2 = 0x16010001;
+         	ec_SDOwrite(1,0x1c12,0,TRUE,os,&ob2,EC_TIMEOUTRXM);
+         	os=sizeof(ob2); ob2 = 0x1a030001;
+         	ec_SDOwrite(1,0x1c13,0, TRUE, os,&ob2,EC_TIMEOUTRXM);
 
-         os=sizeof(ob2); ob2 = 0x1a020001;
-         ec_SDOwrite(1,0x1c13,0, TRUE, os,&ob2,EC_TIMEOUTRXM);
+	 	//!!!!!!original working!!!!!
+	 	//os=sizeof(ob2); ob2 = 0x16010001;
+         	//ec_SDOwrite(1,0x1c12,0,TRUE,os,&ob2,EC_TIMEOUTRXM);
+         	//os=sizeof(ob2); ob2 = 0x1a020001;
+         	//ec_SDOwrite(1,0x1c13,0, TRUE, os,&ob2,EC_TIMEOUTRXM);
+
+		}
+	
+	else if (loopmode == POS_MOD)
+		{
+		WRITE(0x6060, 0, buf8, 8, "OpMode");
+         	READ(0x6061, 0, buf8, "OpMode display");
+
+
+         	READ(0x1c12, 0, buf32, "rxPDO:0");
+         	READ(0x1c13, 0, buf32, "txPDO:0");
+
+         	READ(0x1c12, 1, buf32, "rxPDO:1");
+         	READ(0x1c13, 1, buf32, "txPDO:1");
+
+
+        	//Position
+         	os=sizeof(ob2); ob2 = 0x16000001;
+         	ec_SDOwrite(1,0x1c12,0,TRUE,os,&ob2,EC_TIMEOUTRXM);
+	 	os=sizeof(ob2); ob2 = 0x1a030001;
+         	ec_SDOwrite(1,0x1c13,0, TRUE, os,&ob2,EC_TIMEOUTRXM);
+
+	 	}
+
 
 //         WRITE(0x1c12, 0, buf32, 0x16010001, "rxPDO");
 //         WRITE(0x1c13, 0, buf32, 0x1A010001, "txPDO");
@@ -249,65 +350,9 @@ void simpletest(char *ifname)
 
             READ(0x1001, 0, buf8, "Error");
 
-            /* cyclic loop */
-            target = (struct VelocOut *)(ec_slave[1].outputs);
-            val = (struct TorqueIn *)(ec_slave[1].inputs);
-
-
-            for(i = 1; i <= 100000; i++)
-            {
-               /** PDO I/O refresh */
-               ec_send_processdata();
-               wkc = ec_receive_processdata(EC_TIMEOUTRET);
-
-                    if(wkc >= expectedWKC)
-                    {
-                        //printf("Processdata cycle %4d, WKC %d,", i, wkc);
-                        printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
-
-                        /** if in fault or in the way to normal status, we update the state machine */
-                        switch(target->status){
-                        case 0:
-                            target->status = 6;
-                            break;
-                        case 6:
-                            target->status = 7;
-                            break;
-                        case 7:
-                            target->status = 15;
-                            break;
-                        case 128:
-                            target->status = 0;
-                            break;
-                        default:
-                            if(val->status >> 3 & 0x01){
-                                READ(0x1001, 0, buf8, "Error");
-                                target->status = 128;
-                            }
-//                            break;
-                        }
-
-
-                        /** we wait to be in ready-to-run mode and with initial value reached */
-                        if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237){
-                            reachedInitial = 1;
-                        }
-
-                        if((val->status & 0x0fff) == 0x0237 && reachedInitial){
-                            //target->veloc = (int32) (sin(i/100.)*(1000));
-                            target->veloc = (int32) 90000;
-
-                        }
-
-                        printf("  Target: 0x%li, control: 0x%li\n", target->veloc, target->status);
-
-                        printf("\r");
-                        needlf = TRUE;
-                    }
-                    usleep(timestep);
-
-                }
-                inOP = FALSE;
+            
+ 	    return(OK);
+            
             }
             else
             {
@@ -342,15 +387,191 @@ void simpletest(char *ifname)
     {
         printf("No socket connection on %s\nExcecute as root\n",ifname);
     }
+    return(NOK);
 }
 
-void ecatcheck( void *ptr )
-{
-    int slave;
 
-    while(1)
-    {
-        if( inOP && ((wkc < expectedWKC) || ec_group[currentgroup].docheckstate))
+/*############################################################################
+#  Title: commandVel()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: command a velocity.  hacked from simpletest.c
+#
+#############################################################################*/
+int commandVel(int targVel)
+{
+needlf = FALSE;
+inOP = FALSE;
+uint32 buf32;
+uint16 buf16;
+uint8 buf8;
+
+//struct PosTrqVelIn *val;
+struct PosVelDioIn *val;
+struct VelocOut *target;
+
+int reachedInitial = 0;
+int timestep = 700;
+
+target = (struct VelocOut *)(ec_slave[1].outputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
+
+	/** PDO I/O refresh */
+	ec_send_processdata();
+	wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+	if(wkc >= expectedWKC)
+		{
+		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
+		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
+		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+
+		/** if in fault or in the way to normal status, we update the state machine */
+		switch(target->control)
+			{
+			case 0:
+				target->control = 6;
+				break;
+			case 6:
+				target->control = 7;
+				break;
+			case 7:
+				target->control = 15;
+				break;
+			case 128:
+				target->control = 0;
+				break;
+			default:
+				if(val->status >> 3 & 0x01){
+					READ(0x1001, 0, buf8, "Error");
+					target->control = 128;
+                            		}
+//                            break;
+                        }
+
+
+		/** we wait to be in ready-to-run mode and with initial value reached */
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
+			{
+			printf("!!!!!!!!!!!!!!!!!!!!!HERE!!!!!!!!!!!!!!!!!!!!!");
+			reachedInitial = 1;
+			}
+
+		if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+			{
+			//target->veloc = (int32) (sin(i/100.)*(1000));
+			target->veloc = (int32) targVel;
+			}
+
+		printf("  Target: 0x%li, Control: 0x%li\n", target->veloc, target->control);
+
+		printf("\r");
+		needlf = TRUE;
+                }
+             
+
+}
+
+/*############################################################################
+#  Title: commandPos
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: command a position.  hacked from simpletest.c
+#
+#############################################################################*/
+int commandPos(int targPos)
+{
+needlf = FALSE;
+inOP = FALSE;
+uint32 buf32;
+uint16 buf16;
+uint8 buf8;
+
+//struct PosTrqVelIn *val;
+struct PosVelDioIn *val;
+struct PosOut *target;
+
+int reachedInitial = 0;
+int timestep = 700;
+
+target = (struct PosOut *)(ec_slave[1].outputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
+
+	/** PDO I/O refresh */
+	ec_send_processdata();
+	wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+	if(wkc >= expectedWKC)
+		{
+		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
+		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+
+		/** if in fault or in the way to normal status, we update the state machine */
+		switch(target->control)
+			{
+			case 0:
+				target->control = 6;
+				break;
+			case 6:
+				target->control = 7;
+				break;
+			case 7:
+				target->control = 15;
+				break;
+			case 128:
+				target->control = 0;
+				break;
+			default:
+				if(val->status >> 3 & 0x01){
+					READ(0x1001, 0, buf8, "Error");
+					target->control = (128);
+					}
+				
+//                            break;
+                        }
+
+
+		/** we wait to be in ready-to-run mode and with initial value reached */
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
+			{
+			reachedInitial = 1;
+			printf("!!!!!!!!!!HERE!!!!!!!!!\n");
+			}
+
+		//else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+		//if((val->status & 0x0fff) == 0x0237)
+		//	{
+			target->pos = (int32) targPos;
+		//	}
+
+		printf("  Target: 0x%li, Control: 0x%li\n", target->pos, target->control);
+
+		printf("\r");
+		needlf = TRUE;
+                }
+             
+
+}
+
+/*############################################################################
+#  Title: ecatErr( void *ptr )
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: check errors on ethercat bus
+#
+#############################################################################*/
+int ecatErr()
+{
+int slave;
+
+if( inOP && ((wkc < expectedWKC) || ec_group[currentgroup].docheckstate))
         {
             if (needlf)
             {
@@ -416,21 +637,40 @@ void ecatcheck( void *ptr )
             if(!ec_group[currentgroup].docheckstate)
                printf(".");
         }
-        usleep(250);
-    }
+        
 }
 
+/*############################################################################
+#  Title: main
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: DUH!!!
+#
+#############################################################################*/
 int main(int argc, char *argv[])
 {
-    int iret1;
+   int mode;
+    int iret1,i;
    printf("SOEM (Simple Open EtherCAT Master)\nSimple test\n");
 
-   if (argc > 1)
+   if (argc > 2)
    {
+	mode=atoi(argv[2]);
       /* create thread to handle slave error handling in OP */
-      iret1 = pthread_create( &thread1, NULL, (void *) &ecatcheck, (void*) &ctime);
+      //iret1 = pthread_create( &thread1, NULL, (void *) &ecatcheck, (void*) &ctime);
       /* start cyclic part */
-      simpletest(argv[1]);
+      
+      initEcat(argv[1], mode);
+	for(i = 1; i <= 100000; i++)
+                {
+		ecatErr();
+		if(mode == VEL_MOD){commandVel(100000);}
+		if(mode == POS_MOD){commandPos(367323677);}
+		usleep(1000);
+
+                }
+      
    }
    else
    {
