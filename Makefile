@@ -10,24 +10,17 @@ LIB_PATH=./lib/qnx
 ################directories######################
 
 SIMPLE-OBJS = simple_test.o
-COPLEY-OBJS = ecat_copley.o configure.o
-ELMO-OBJS = ecat_elmo.o configure.o
-ELMO-TEST-OBJS = elmo_test.o configure.o
-TEST_TORQUE-OBJS = simple_test_torque.o
-TEST_VELOC-OBJS = simple_test_veloc.o
+NG-OBJS = ecat_ng.o
 
 ###############binaries####################
 
-all: simple_test_veloc
+all: ecat_ng simple_test
 
-ecat_copley: $(COPLEY-OBJS)
-	$(CC) $^ -o  ecat_copley -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
+ecat_ng: $(NG-OBJS)
+	$(CC) $^ -o  ecat_ng -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
 
-ecat_elmo: $(ELMO-OBJS)
-	$(CC) $^ -o  ecat_elmo -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
-
-elmo_test: $(ELMO-TEST-OBJS)
-	$(CC) $^ $(INCLUDE_PATHS) -L$(LIB_PATH) -o elmo_test -lsoem -loshw -losal -lsocket
+ecat_ng.o: ecat_ng.c ecat_ng.h
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat_ng.c
 
 simple_test: $(SIMPLE-OBJS)
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) simple_test.c -o simple_test -lsoem -loshw -losal -lsocket
@@ -35,32 +28,8 @@ simple_test: $(SIMPLE-OBJS)
 simple_test.o: simple_test.c
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c simple_test.c
 
-ecat_elmo.o: ecat_elmo.c
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat_elmo.c
-
-elmo_test.o: elmo_test.c
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c elmo_test.c
-
-ecat_copley.o: ecat_copley.c
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat_copley.c
-
-configure.o: configure.c
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c configure.c
-
-
-simple_test_torque.o: simple_test_torque.c
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c simple_test_torque.c
-
-simple_test_torque: $(TEST_TORQUE-OBJS)
-	$(CC) $^ -o simple_test_torque -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
-
-simple_test_veloc.o: simple_test_veloc.c
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c simple_test_veloc.c
-
-simple_test_veloc: $(TEST_VELOC-OBJS)
-	$(CC) $^ -o simple_test_veloc -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
 
 ###############utils#######################
 clean: \
-;rm *.o simple_test_veloc
+;rm *.o ecat_ng simple_test
 
