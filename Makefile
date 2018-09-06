@@ -11,16 +11,23 @@ LIB_PATH=./lib/qnx
 
 SIMPLE-OBJS = simple_test.o
 NG-OBJS = ecat_ng.o
+STANDALONE-OBJS = ecat_ng.o ecat_standalone.o
 
 ###############binaries####################
 
-all: ecat_ng simple_test
+all: simple_test ecat_standalone
 
 ecat_ng: $(NG-OBJS)
 	$(CC) $^ -o  ecat_ng -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
 
 ecat_ng.o: ecat_ng.c ecat_ng.h
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat_ng.c
+
+ecat_standalone: $(STANDALONE-OBJS)
+	$(CC) $^ -o  ecat_standalone -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
+
+ecat_standalone.o: ecat_standalone.c ecat_ng.h
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat_standalone.c
 
 simple_test: $(SIMPLE-OBJS)
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) simple_test.c -o simple_test -lsoem -loshw -losal -lsocket

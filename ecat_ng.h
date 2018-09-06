@@ -1,4 +1,9 @@
-extern void init();
+extern void initEcat();
 extern int configure();
+int commandVel(int targVel);
+int commandPos(int targPos);
 
-char DEVID[20];
+
+#define OK 0
+#define NOK 1
+
