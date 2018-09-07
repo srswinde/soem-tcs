@@ -1,5 +1,5 @@
 /*############################################################################
-#  Title: soemEcat.c
+#  Title: ecat_ng.c
 #  Author: C. Johnson / S. Swindell
 #  Date: 9/2/18
 #  Args:  N/A
@@ -92,16 +92,35 @@ unsigned short homingAttained: 1;
 unsigned short ms: 3;
 } ecat_statusword;
 
+
+typedef union
+{
+ecat_controlword cword;
+uint16 cword_int;
+}controlword_union;
+
+
+typedef union
+{
+ecat_statusword sword;
+uint16 sword_int;
+}statusword_union;
+
+
 struct PosOut { //0x1600 -- cyclic position rxpdo
     uint32 pos;
     uint32 dio;
-    uint16 control;
+    controlword_union control;
+    //int16 control;
 };
 
 struct VelocOut { //0x1601 -- cyclic velocity rxpdo
     uint32 veloc;
-    uint16 control;
+    controlword_union control;
+    //int16 control;
 };
+
+
 
 struct PVTOut { //0x1606
     uint32 pos;
@@ -123,7 +142,7 @@ struct PosVelDioIn {  //0x1A03 -- velovity AND position mode txpdo
     int32 position;
     uint32 dio;
     int32 velocity;
-    uint16 status;
+    statusword_union status;
 };
 
 
@@ -163,6 +182,20 @@ unsigned short ms: 3;
 
 
 int reachedInitial;
+
+typedef struct
+{
+char name[50];
+int position;
+int velocity;
+short current;
+} axisdata;
+
+axisdata axisdata_all[8];
+
+
+
+
 
 
 
@@ -432,6 +465,12 @@ int initEcat(char *ifname, int loopmode)
 
             int reachedInitial = 0;
 
+	    //added by cj
+	    while(!reachedInitial)
+		{
+		elevateStat(0);
+		}
+
             READ(0x1001, 0, buf8, "Error");
 
             
@@ -474,6 +513,18 @@ int initEcat(char *ifname, int loopmode)
     return(NOK);
 }
 
+/*############################################################################
+#  Title: getPosition(int axis)
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: command a velocity.  hacked from simpletest.c
+#
+#############################################################################*/
+int ecat_getPosition(int axis)
+{
+return axisdata_all[axis].position;
+}
 
 /*############################################################################
 #  Title: commandVel()
@@ -509,8 +560,8 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 
 	if(wkc >= expectedWKC)
 		{
-		ctrl_macro=(uint16) target->control;
-		stat_macro=(uint16) val->status;
+		ctrl_macro=(uint16) target->control.cword_int;
+		stat_macro=(uint16) val->status.sword_int;
 		
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
@@ -552,11 +603,101 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 			}
 
 		printf("  Target: %li, Control: %li\n", target->veloc, ctrl_macro);
-		memcpy(&val->status, &stat_macro, 2);
+		
 		memcpy(&target->control, &ctrl_macro, 2);
 
 		printf("\r");
 		needlf = TRUE;
+                }
+             
+
+}
+
+/*############################################################################
+#  Title: elevateStat
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  desc: run through one to try to stuff position
+#
+#############################################################################*/
+int elevateStat(int axis)
+{
+needlf = FALSE;
+inOP = FALSE;
+uint32 buf32;
+uint16 buf16;
+uint8 buf8;
+uint16 ctrl_macro, stat_macro;
+
+//struct PosTrqVelIn *val;
+struct PosVelDioIn *val;
+struct PosOut *target;
+
+int timestep = 700;
+
+target = (struct PosOut *)(ec_slave[1].outputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
+
+	/** PDO I/O refresh */
+	ec_send_processdata();
+	wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+	if(wkc >= expectedWKC)
+		{
+		ctrl_macro=(uint16) target->control.cword_int;
+		stat_macro=(uint16) val->status.sword_int;
+		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
+		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		
+		/** if in fault or in the way to normal status, we update the state machine */
+		switch(ctrl_macro)
+			{
+			case CTRL_DEAD:
+				ctrl_macro = CTRL_SHUTDOWN;
+				break;
+			case CTRL_SHUTDOWN:
+				ctrl_macro = CTRL_SWITCH_ON;
+				break;
+			case CTRL_SWITCH_ON:
+				ctrl_macro = CTRL_SWITCH_ON_ENABLE_OP;
+				break;
+			case CTRL_HALT:
+				ctrl_macro = CTRL_DEAD;
+				break;
+			default:
+				if(stat_macro >> 3 & 0x01){
+					READ(0x1001, 0, buf8, "Error");
+					ctrl_macro = 128;
+                            		}
+//                            break;
+                        }
+
+
+		/** we wait to be in ready-to-run mode and with initial value reached */
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (stat_macro & 0x0fff) == STAT_ALL_READY)
+			{
+			reachedInitial = 1;
+			target->pos = val->position;
+			}
+
+		/*if((stat_macro & 0x0fff) == STAT_ALL_READY && reachedInitial)
+		//if((val->status & 0x0fff) == 0x0237)
+			{
+			target->pos = (int32) targPos;
+			}*/
+
+		printf("  Target: %li, Control: %li\n", target->pos, target->control);
+
+		axisdata_all[0].position = val->position;
+
+		memcpy(&target->control, &ctrl_macro, 2);
+
+		printf("\r");
+		needlf = TRUE;
+		return reachedInitial;
                 }
              
 
@@ -596,8 +737,8 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 
 	if(wkc >= expectedWKC)
 		{
-		ctrl_macro=(uint16) target->control;
-		stat_macro=(uint16) val->status;
+		ctrl_macro=(uint16) target->control.cword_int;
+		stat_macro=(uint16) val->status.sword_int;
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
 		
@@ -640,8 +781,8 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 
 		printf("  Target: %li, Control: %li\n", target->pos, target->control);
 
-		
-		memcpy(&val->status, &stat_macro, 2);
+		axisdata_all[0].position = val->position;
+
 		memcpy(&target->control, &ctrl_macro, 2);
 
 		printf("\r");

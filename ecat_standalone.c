@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
                 {
 		ecatErr();
 		if(mode == VEL_MOD){commandVel(100000);}
-		if(mode == POS_MOD){commandPos(28863716);}
+		if(mode == POS_MOD){commandPos(ecat_getPosition(0));}
+		//if(mode == POS_MOD){commandPos(28863716);}
 		usleep(1000);
 
                 }

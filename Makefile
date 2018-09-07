@@ -38,5 +38,5 @@ simple_test.o: simple_test.c
 
 ###############utils#######################
 clean: \
-;rm *.o ecat_ng simple_test
+;rm *.o simple_test ecat_standalone
 
