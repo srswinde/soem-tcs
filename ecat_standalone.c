@@ -2,12 +2,85 @@
 #include <string.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <math.h>
+#include <stdint.h> /*int32_t*/
+
+#define OK 0
+#define NOK 1
 
 
 #define VEL_MOD 0
 #define POS_MOD 1
+#define IFNAME "rt0"
+#define ALT 0
+
+void usage(char *argv[])
+{
+	printf("Usage: %s <ifname> <testname> <arg1>\nLike: %s rt0 CJ 1\n", argv[0], argv[0]);
+}
 
 
+
+void test_constant_vel(char *ifname)
+{
+	int init_resp;
+	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
+	init_resp=initEcat(ifname, VEL_MOD, ALT);
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+	while (1)
+	{
+		commandVel( ALT, 15*ASECS2CNTS ); //Tracking Speed
+	}
+}
+
+void test_sin_pos(char *ifname)
+{
+	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
+	int init_resp;
+	init_resp = initEcat(ifname, POS_MOD, ALT);	
+
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+
+	int32_t zpos;
+	zpos = ecat_read_encoder(ALT);
+	int encpos;
+	int out=0;
+	float angle = 0.0;
+	while (1)
+	{
+		
+		commandPos( ALT, zpos + (int) (10000*sin(angle))  );
+		out = ecat_read_encoder( ALT );
+		angle = angle+3.14159*0.0001;
+
+	}
+}
+
+void test_init(char *ifname)
+{
+	int init_resp;
+	init_resp = initEcat2(ifname, POS_MOD, ALT);	
+
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+
+}
+
+void test_test()
+{
+	printf("IT WORKED\n");
+}
 
 /*############################################################################
 #  Title: main
@@ -25,30 +98,31 @@ int main(int argc, char *argv[])
 
    if (argc > 2)
    {
-	mode=atoi(argv[2]);
-      /* create thread to handle slave error handling in OP */
-      //iret1 = pthread_create( &thread1, NULL, (void *) &ecatcheck, (void*) &ctime);
-      /* start cyclic part */
-      
-      initEcat(argv[1], mode);
 	
 
-	for(i = 1; i <= 100000; i++)
-                {
-		ecatErr();
-		if(mode == VEL_MOD){commandVel(100000);}
-		if(mode == POS_MOD){commandPos(ecat_getPosition(0));}
-		//if(mode == POS_MOD){commandPos(28863716);}
-		usleep(1000);
+		if( strcmp( argv[2], "CONS_VEL" ) == 0 )
+			test_constant_vel( argv[1] ); 
 
-                }
-      
-   }
+		else if( strcmp( argv[2], "SIN_POS" ) == 0 )
+			test_sin_pos(  argv[1] );
+		else if( strcmp( argv[2], "TEST" ) == 0 )
+			test_test(  argv[1] );
+
+		else if( strcmp( argv[2], "INIT" ) == 0 )
+			test_init(  argv[1] );
+
+		else
+			usage(argv);
+
+
+   }	
    else
    {
-      printf("Usage: simple_test ifname1\nifname = eth0 for example\n");
+	   usage(argv);
    }
 
    printf("End program\n");
    return (0);
 }
+
+
