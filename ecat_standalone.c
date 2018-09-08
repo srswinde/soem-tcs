@@ -50,24 +50,56 @@ void test_sin_pos(char *ifname)
 	}
 
 	int32_t zpos;
-	zpos = ecat_read_encoder(ALT);
+	zpos = ecat_getPosition(ALT);
 	int encpos;
 	int out=0;
 	float angle = 0.0;
 	while (1)
 	{
 		
-		commandPos( ALT, zpos + (int) (10000*sin(angle))  );
-		out = ecat_read_encoder( ALT );
+		commandPos( ALT, zpos + (int) (3*500000*sin(angle))  );
+		//out = ecat_getPosition( ALT );
 		angle = angle+3.14159*0.0001;
+		usleep(700);
 
 	}
 }
 
+
+
+void test_constant_pos(char *ifname)
+{
+	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
+	int init_resp;
+	init_resp = initEcat(ifname, POS_MOD, ALT);	
+
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+
+	int32_t zpos;
+	zpos = ecat_getPosition(ALT);
+	int encpos;
+	int out=0;
+	float angle = 0.0;
+	while (1)
+	{
+		
+		commandPos( ALT, zpos + (int) 500000  );
+		//out = ecat_getPosition( ALT );
+		//angle = angle+3.14159*0.0001;
+		
+
+	}
+}
+
+
 void test_init(char *ifname)
 {
 	int init_resp;
-	init_resp = initEcat2(ifname, POS_MOD, ALT);	
+	init_resp = initEcat(ifname, POS_MOD, ALT);	
 
 	if( init_resp == NOK )
 	{
@@ -111,6 +143,8 @@ int main(int argc, char *argv[])
 		else if( strcmp( argv[2], "INIT" ) == 0 )
 			test_init(  argv[1] );
 
+		else if( strcmp( argv[2], "CONS_POS" ) == 0 )
+			test_constant_pos(  argv[1] );
 		else
 			usage(argv);
 

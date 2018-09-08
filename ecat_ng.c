@@ -181,7 +181,7 @@ unsigned short ms: 3;
 } statusword;
 
 
-int reachedInitial;
+static int reachedInitial;
 
 typedef struct
 {
@@ -463,14 +463,12 @@ int initEcat(char *ifname, int loopmode)
             READ(0x1a0b, 0, buf8, "OpMode Display");
 
 
-            int reachedInitial = 0;
 
 	    //added by cj
 	    while(!reachedInitial)
 		{
 		elevateStat(0);
 		}
-
             READ(0x1001, 0, buf8, "Error");
 
             
@@ -650,7 +648,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		ctrl_macro=(uint16) target->control.cword_int;
 		stat_macro=(uint16) val->status.sword_int;
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
-		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		printf("  Elevate State pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
 		
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(ctrl_macro)
@@ -679,6 +677,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		/** we wait to be in ready-to-run mode and with initial value reached */
 		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (stat_macro & 0x0fff) == STAT_ALL_READY)
 			{
+			printf("FUCK MEEEEEEEEEE, ");
 			reachedInitial = 1;
 			target->pos = val->position;
 			}
@@ -711,7 +710,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 #  Description: command a position.  hacked from simpletest.c
 #
 #############################################################################*/
-int commandPos(int targPos)
+int commandPos(int axis, int targPos)
 {
 needlf = FALSE;
 inOP = FALSE;
@@ -732,8 +731,6 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 
 
 	/** PDO I/O refresh */
-	ec_send_processdata();
-	wkc = ec_receive_processdata(EC_TIMEOUTRET);
 
 	if(wkc >= expectedWKC)
 		{
@@ -764,7 +761,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
                             		}
 //                            break;
                         }
-
+	
 
 		/** we wait to be in ready-to-run mode and with initial value reached */
 		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (stat_macro & 0x0fff) == STAT_ALL_READY)
@@ -784,6 +781,8 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		axisdata_all[0].position = val->position;
 
 		memcpy(&target->control, &ctrl_macro, 2);
+		ec_send_processdata();
+		wkc = ec_receive_processdata(EC_TIMEOUTRET);
 
 		printf("\r");
 		needlf = TRUE;
