@@ -428,6 +428,7 @@ int initEcat(char *ifname, int loopmode)
             ec_send_processdata();
             ec_receive_processdata(EC_TIMEOUTRET);
             ec_statecheck(0, EC_STATE_OPERATIONAL, 50000);
+	    usleep(1e5);
          }
          while (chk-- && (ec_slave[0].state != EC_STATE_OPERATIONAL));
          if (ec_slave[0].state == EC_STATE_OPERATIONAL )
@@ -696,6 +697,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 
 		printf("\r");
 		needlf = TRUE;
+		usleep(5e10);
 		return reachedInitial;
                 }
              
@@ -787,6 +789,10 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		printf("\r");
 		needlf = TRUE;
                 }
+		else
+		{
+			printf("TROUBLE expectWKC %i, WKC %i\n", expectedWKC, wkc);
+		}
              
 
 }

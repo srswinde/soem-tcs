@@ -54,15 +54,15 @@ void test_sin_pos(char *ifname)
 	int encpos;
 	int out=0;
 	float angle = 0.0;
-	while (1)
+	while (angle < 0.1)
 	{
-		
 		commandPos( ALT, zpos + (int) (3*500000*sin(angle))  );
 		//out = ecat_getPosition( ALT );
 		angle = angle+3.14159*0.0001;
-		usleep(700);
+		usleep(1e4);
 
 	}
+	ec_close();
 }
 
 
