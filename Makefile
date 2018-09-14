@@ -1,8 +1,8 @@
 CROSS_COMPILER=/usr/local/gcc-cross/
-CC=$(CROSS_COMPILER)bin/i386-pc-nto-qnx-gcc
+#CC=$(CROSS_COMPILER)bin/i386-pc-nto-qnx-gcc
 #C_INCLUDE_PATH=$(CROSS_COMPILER)i386-pc-nto-qnx/include
 #LD_LIBRARY_PATH=$(CROSS_COMPILER)i386-pc-nto-qnx/lib
-#CC=qcc -V gcc_ntox86
+CC=qcc -V gcc_ntox86
 INCLUDE_PATHS=-I./include -I./include/osal -I./include/qnx
 LIB_PATH=./lib/qnx
 #################################################
@@ -15,10 +15,11 @@ ELMO-OBJS = ecat_elmo.o configure.o
 ELMO-TEST-OBJS = elmo_test.o configure.o
 TEST_TORQUE-OBJS = simple_test_torque.o
 TEST_VELOC-OBJS = simple_test_veloc.o
+ECAT_STANDALONE_OBJS = ecat-standalone.o ecat-ng.o
 
 ###############binaries####################
 
-all: simple_test_veloc
+all: ecat-standalone
 
 ecat_copley: $(COPLEY-OBJS)
 	$(CC) $^ -o  ecat_copley -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
@@ -59,6 +60,15 @@ simple_test_veloc.o: simple_test_veloc.c
 
 simple_test_veloc: $(TEST_VELOC-OBJS)
 	$(CC) $^ -o simple_test_veloc -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
+
+ecat-ng.o: ecat-ng.c
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-ng.c
+
+ecat-standalone.o: ecat-standalone.c
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-standalone.c
+
+ecat-standalone: $(ECAT_STANDALONE_OBJS)
+	$(CC) $^ -o ecat-standalone -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
 
 ###############utils#######################
 clean: \
