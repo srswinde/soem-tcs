@@ -37,6 +37,8 @@
 #define OK 0
 #define NOK 1
 
+int reachedInitial;
+
 char IOmap[4096];
 pthread_t thread1;
 int expectedWKC;
@@ -83,6 +85,17 @@ struct PosVelDioIn {  //0x1A03
     int32 velocity;
     uint16 status;
 };
+
+typedef struct
+{
+int32 position;
+uint32 dio;
+int32 velocity;
+int32 current;
+}motordata_type;
+
+motordata_type motors[8];
+
 
 
 /*############################################################################
@@ -151,8 +164,15 @@ int initEcat(char *ifname, int loopmode)
     uint16 buf16;
     uint8 buf8;
 
-    struct PosTrqVelIn *val;
+//    struct PosVelDioIn *val;
     struct VelocOut *target;
+    struct PosOut *Ptarget;
+target = (struct VelocOut *)(ec_slave[0].outputs);
+Ptarget = (struct PosOut *)(ec_slave[0].outputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+//val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
 
    printf("Starting simple test\n");
 
@@ -346,8 +366,26 @@ int initEcat(char *ifname, int loopmode)
    CHECKERROR();
             READ(0x1a0b, 0, buf8, "OpMode Display");
 
+/*		usleep(10000);
+		ec_send_processdata();
+            	ec_receive_processdata(EC_TIMEOUTRET);
+                target->control=128;
+		usleep(10000);
+		ec_send_processdata();
+            	ec_receive_processdata(EC_TIMEOUTRET);
+                usleep(10000);*/
+			
 
-            int reachedInitial = 0;
+
+            reachedInitial = 0;
+		while(!reachedInitial)
+			{
+			if(loopmode==0)
+				reachInit(loopmode);
+			if(loopmode==1)
+				reachInitP(loopmode);
+			usleep(10000);
+			}
 
             READ(0x1001, 0, buf8, "Error");
 
@@ -391,6 +429,182 @@ int initEcat(char *ifname, int loopmode)
     return(NOK);
 }
 
+/*############################################################################
+#  Title: reachInit()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: command a velocity.  hacked from simpletest.c
+#
+#############################################################################*/
+int reachInit(int mode)
+{
+needlf = FALSE;
+inOP = FALSE;
+uint32 buf32;
+uint16 buf16;
+uint8 buf8;
+
+//struct PosTrqVelIn *val;
+struct PosVelDioIn *val;
+struct VelocOut *target;
+
+//int reachedInitial = 0;
+int timestep = 700;
+
+target = (struct VelocOut *)(ec_slave[1].outputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
+
+	/** PDO I/O refresh */
+	ec_send_processdata();
+	wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+	if(wkc >= expectedWKC)
+		{
+		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
+		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
+		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+
+		/** if in fault or in the way to normal status, we update the state machine */
+		switch(target->control)
+			{
+			case 0:
+				target->control = 6;
+				break;
+			case 6:
+				target->control = 7;
+				break;
+			case 7:
+				target->control = 15;
+				break;
+			case 128:
+				target->control = 0;
+				break;
+			default:
+				if(val->status >> 3 & 0x01){
+					READ(0x1001, 0, buf8, "Error");
+					target->control = 128;
+                            		}
+//                            break;
+                        }
+
+
+		/** we wait to be in ready-to-run mode and with initial value reached */
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
+			{
+			printf("!!!!!!!!!!!!!!!!!!!!!HERE!!!!!!!!!!!!!!!!!!!!!");
+			reachedInitial = 1;
+			motors[0].position=val->position;
+			motors[0].velocity=val->velocity;
+			
+			}
+
+/*		if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+			{
+			//target->veloc = (int32) (sin(i/100.)*(1000));
+			target->veloc = (int32) targVel;
+			}
+
+		printf("  Target: 0x%li, Control: 0x%li\n", target->veloc, target->control);
+
+		printf("\r");
+		needlf = TRUE;*/
+		
+                }
+             
+
+}
+
+/*############################################################################
+#  Title: reachInit()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: command a velocity.  hacked from simpletest.c
+#
+#############################################################################*/
+int reachInitP(int mode)
+{
+needlf = FALSE;
+inOP = FALSE;
+uint32 buf32;
+uint16 buf16;
+uint8 buf8;
+
+//struct PosTrqVelIn *val;
+struct PosVelDioIn *val;
+struct PosOut *target;
+
+//int reachedInitial = 0;
+int timestep = 700;
+
+target = (struct PosOut *)(ec_slave[1].outputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
+
+	/** PDO I/O refresh */
+	ec_send_processdata();
+	wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+	if(wkc >= expectedWKC)
+		{
+		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
+		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
+		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+
+		/** if in fault or in the way to normal status, we update the state machine */
+		switch(target->control)
+			{
+			case 0:
+				target->control = 6;
+				break;
+			case 6:
+				target->control = 7;
+				break;
+			case 7:
+				target->control = 15;
+				break;
+			case 128:
+				target->control = 0;
+				break;
+			default:
+				if(val->status >> 3 & 0x01){
+					READ(0x1001, 0, buf8, "Error");
+					target->control = 128;
+                            		}
+//                            break;
+                        }
+
+
+		/** we wait to be in ready-to-run mode and with initial value reached */
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
+			{
+			printf("!!!!!!!!!!!!!!!!!!!!!HERE!!!!!!!!!!!!!!!!!!!!!");
+			reachedInitial = 1;
+			motors[0].position=val->position;
+			motors[0].velocity=val->velocity;
+			
+			}
+
+/*		if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+			{
+			//target->veloc = (int32) (sin(i/100.)*(1000));
+			target->veloc = (int32) targVel;
+			}
+
+		printf("  Target: 0x%li, Control: 0x%li\n", target->veloc, target->control);
+
+		printf("\r");
+		needlf = TRUE;*/
+		
+                }
+             
+
+}
 
 /*############################################################################
 #  Title: commandVel()
@@ -412,7 +626,7 @@ uint8 buf8;
 struct PosVelDioIn *val;
 struct VelocOut *target;
 
-int reachedInitial = 0;
+//int reachedInitial = 0;
 int timestep = 700;
 
 target = (struct VelocOut *)(ec_slave[1].outputs);
@@ -496,7 +710,7 @@ uint8 buf8;
 struct PosVelDioIn *val;
 struct PosOut *target;
 
-int reachedInitial = 0;
+//int reachedInitial = 0;
 int timestep = 700;
 
 target = (struct PosOut *)(ec_slave[1].outputs);
@@ -548,7 +762,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		//else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
 		//if((val->status & 0x0fff) == 0x0237)
 		//	{
-			target->pos = (int32) targPos;
+			target->pos = motors[0].position;
 		//	}
 
 		printf("  Target: 0x%li, Control: 0x%li\n", target->pos, target->control);

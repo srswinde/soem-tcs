@@ -9,12 +9,7 @@ LIB_PATH=./lib/qnx
 # makefile for ethercat TCS-NG Drivers		#
 ################directories######################
 
-SIMPLE-OBJS = simple_test.o
-COPLEY-OBJS = ecat_copley.o configure.o
-ELMO-OBJS = ecat_elmo.o configure.o
-ELMO-TEST-OBJS = elmo_test.o configure.o
-TEST_TORQUE-OBJS = simple_test_torque.o
-TEST_VELOC-OBJS = simple_test_veloc.o
+SIMPLE_OBJS = simple_test.o
 ECAT_STANDALONE_OBJS = ecat-standalone.o ecat-ng.o
 
 ###############binaries####################
@@ -23,7 +18,7 @@ all: simple_test ecat-standalone
 
 ecat_copley: $(COPLEY-OBJS)
 
-simple_test: $(SIMPLE-OBJS)
+simple_test: $(SIMPLE_OBJS)
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) simple_test.c -o simple_test -lsoem -loshw -losal -lsocket
 
 simple_test.o: simple_test.c
