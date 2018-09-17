@@ -14,7 +14,7 @@ ECAT_STANDALONE_OBJS = ecat-standalone.o ecat-ng.o
 
 ###############binaries####################
 
-all: simple_test ecat-standalone
+all: simple_test ecat-standalone 
 
 ecat_copley: $(COPLEY-OBJS)
 

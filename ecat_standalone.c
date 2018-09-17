@@ -25,7 +25,7 @@ void test_constant_vel(char *ifname)
 {
 	int init_resp;
 	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
-	init_resp=initEcat(ifname, VEL_MOD);
+	init_resp=initEcat(ifname, VEL_MOD, ALT);
 	if( init_resp == NOK )
 	{
 		printf("initEcat returned NOK\n");
@@ -33,8 +33,7 @@ void test_constant_vel(char *ifname)
 	}
 	while (1)
 	{
-		commandVel( 100000 ); //Tracking Speed
-		usleep(1000);
+		commandVel( ALT, 15*ASECS2CNTS ); //Tracking Speed
 	}
 }
 
@@ -42,7 +41,37 @@ void test_sin_pos(char *ifname)
 {
 	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
 	int init_resp;
-	init_resp = initEcat(ifname, POS_MOD );	
+	init_resp = initEcat(ifname, POS_MOD, ALT);	
+
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+
+	int32_t zpos;
+	zpos = ecat_getPosition(ALT);
+	int encpos;
+	int out=0;
+	float angle = 0.0;
+	while (angle < 0.1)
+	{
+		commandPos( ALT, zpos + (int) (3*500000*sin(angle))  );
+		//out = ecat_getPosition( ALT );
+		angle = angle+3.14159*0.0001;
+		usleep(1e4);
+
+	}
+	ec_close();
+}
+
+
+
+void test_constant_pos(char *ifname)
+{
+	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
+	int init_resp;
+	init_resp = initEcat(ifname, POS_MOD, ALT);	
 
 	if( init_resp == NOK )
 	{
@@ -57,46 +86,12 @@ void test_sin_pos(char *ifname)
 	float angle = 0.0;
 	while (1)
 	{
-		//commandPos( zpos + (int) (3*500000*sin(angle))  );
-		zpos = ecat_getPosition(ALT);
-		commandPos( zpos + 1000  );
-		//out = ecat_getPosition( ALT );
-		//angle = angle+3.14159*0.000001;
-		usleep(1000);
-
-	}
-	ec_close();
-}
-
-
-
-void test_constant_pos(char *ifname)
-{
-	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
-	int init_resp;
-	init_resp = initEcat(ifname, POS_MOD);	
-
-	if( init_resp == NOK )
-	{
-		printf("initEcat returned NOK\n");
-		return;
-	}
-
-	int zpos;
-	zpos = ecat_getPosition(ALT);
-	int encpos;
-	int out=0;
-	float angle = 0.0;
-	while (1)
-	{
 		
-		//commandPos( zpos + (int) 500000  );
-		commandPos( -38742744  );
+		commandPos( ALT, zpos + (int) 500000  );
 		//out = ecat_getPosition( ALT );
 		//angle = angle+3.14159*0.0001;
 		
 
-		usleep(1000);
 	}
 }
 

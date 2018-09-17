@@ -644,6 +644,8 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
 		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
 
+		motors[0].position = val->position;
+		motors[0].velocity = val->velocity;
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(target->control)
 			{
@@ -726,7 +728,8 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		{
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
-
+		motors[0].position = val->position;
+		motors[0].velocity = val->velocity;
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(target->control)
 			{
@@ -762,7 +765,8 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		//else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
 		//if((val->status & 0x0fff) == 0x0237)
 		//	{
-			target->pos = motors[0].position;
+			//target->pos = targPos;
+			target->pos = targPos;
 		//	}
 
 		printf("  Target: 0x%li, Control: 0x%li\n", target->pos, target->control);
@@ -855,4 +859,10 @@ if( inOP && ((wkc < expectedWKC) || ec_group[currentgroup].docheckstate))
         
 }
 
+
+
+int ecat_getPosition(int ax)
+{
+	return motors[0].position;
+}
 
