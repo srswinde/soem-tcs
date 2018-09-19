@@ -683,7 +683,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 			target->veloc = (int32) targVel;
 			}
 
-		printf("  Target: 0x%li, Control: 0x%li\n", target->veloc, target->control);
+		printf("  Target: %li, Control: %li\n", target->veloc, target->control);
 
 		printf("\r");
 		needlf = TRUE;
@@ -769,7 +769,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 			target->pos = targPos;
 		//	}
 
-		printf("  Target: 0x%li, Control: 0x%li\n", target->pos, target->control);
+		printf("  Target: %li, Control: %li\n", target->pos, target->control);
 
 		printf("\r");
 		needlf = TRUE;

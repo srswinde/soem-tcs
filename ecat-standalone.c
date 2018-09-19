@@ -5,14 +5,14 @@
 #include <math.h>
 #include <stdint.h> /*int32_t*/
 
-#define OK 0
-#define NOK 1
-
-
 #define VEL_MOD 0
 #define POS_MOD 1
 #define IFNAME "rt0"
 #define ALT 0
+
+#define OK 0
+#define NOK 1
+
 
 void usage(char *argv[])
 {
@@ -33,6 +33,7 @@ void test_constant_vel(char *ifname)
 	}
 	while (1)
 	{
+		ecatErr();
 		commandVel( 100000 ); //Tracking Speed
 		usleep(1000);
 	}
@@ -51,18 +52,19 @@ void test_sin_pos(char *ifname)
 	}
 
 	int32_t zpos;
-	zpos = ecat_getPosition(ALT);
+	zpos = ecat_getPosition(ALT)-500;
 	int encpos;
 	int out=0;
 	float angle = 0.0;
 	while (1)
 	{
-		//commandPos( zpos + (int) (3*500000*sin(angle))  );
-		zpos = ecat_getPosition(ALT);
-		commandPos( zpos + 1000  );
+		zpos += (int) (1000*sin(angle));
+		commandPos( zpos   );
+		//zpos = ecat_getPosition(ALT);
+		//commandPos( zpos );
 		//out = ecat_getPosition( ALT );
-		//angle = angle+3.14159*0.000001;
-		usleep(1000);
+		angle = angle+3.14159*0.001;
+		usleep(500);
 
 	}
 	ec_close();
@@ -75,7 +77,6 @@ void test_constant_pos(char *ifname)
 	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
 	int init_resp;
 	init_resp = initEcat(ifname, POS_MOD);	
-
 	if( init_resp == NOK )
 	{
 		printf("initEcat returned NOK\n");
@@ -83,15 +84,16 @@ void test_constant_pos(char *ifname)
 	}
 
 	int zpos;
-	zpos = ecat_getPosition(ALT);
+	zpos = ecat_getPosition(ALT) + 500000;
 	int encpos;
 	int out=0;
 	float angle = 0.0;
+	ecatErr();
 	while (1)
 	{
 		
-		//commandPos( zpos + (int) 500000  );
-		commandPos( -38742744  );
+		commandPos( zpos );//+ (int) 3*500000  );
+		//commandPos( -38742744  );
 		//out = ecat_getPosition( ALT );
 		//angle = angle+3.14159*0.0001;
 		
@@ -100,7 +102,38 @@ void test_constant_pos(char *ifname)
 	}
 }
 
+void test_increment_pos(char *ifname)
+{
+	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
+	int init_resp;
+	init_resp = initEcat(ifname, POS_MOD);	
 
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+
+	int zpos;
+	zpos = ecat_getPosition(ALT) - 500;
+	int encpos;
+	int out=0;
+	float angle = 0.0;
+	while (1)
+	{
+		
+		//zpos = ecat_getPosition( ALT );
+		zpos -= 500;
+		commandPos( zpos );
+		//commandPos( -38742744  );
+		//encpos = ecat_getPosition( ALT );
+		//printf("Encoder Position %d\n", encpos);
+		//angle = angle+3.14159*0.0001;
+		
+
+		usleep(500);
+	}
+}
 void test_init(char *ifname)
 {
 	int init_resp;
@@ -110,6 +143,11 @@ void test_init(char *ifname)
 	{
 		printf("initEcat returned NOK\n");
 		return;
+	}
+	while (1)
+	{
+		//commandRead();
+		usleep(700);
 	}
 
 }
@@ -150,6 +188,10 @@ int main(int argc, char *argv[])
 
 		else if( strcmp( argv[2], "CONS_POS" ) == 0 )
 			test_constant_pos(  argv[1] );
+		
+		else if( strcmp( argv[2], "INC_POS" ) == 0 )
+			test_increment_pos(  argv[1] );
+
 		else
 			usage(argv);
 
