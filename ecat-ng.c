@@ -34,8 +34,6 @@
 
 
 
-#define OK 0
-#define NOK 1
 
 int reachedInitial;
 
@@ -46,6 +44,8 @@ boolean needlf;
 volatile int wkc;
 boolean inOP;
 uint8 currentgroup = 0;
+
+
 
 struct PosOut { //0x1600
     uint32 pos;
@@ -89,9 +89,12 @@ struct PosVelDioIn {  //0x1A03
 typedef struct
 {
 int32 position;
+int32 target_position;
 uint32 dio;
 int32 velocity;
 int32 current;
+int16 status_word;
+int16 control_word;
 }motordata_type;
 
 motordata_type motors[8];
@@ -239,7 +242,7 @@ Ptarget = (struct PosOut *)(ec_slave[0].outputs);
 
 		}
 	
-	else if (loopmode == POS_MOD)
+	else if (loopmode == POS_MOD || loopmode == READ_MOD )
 		{
 		WRITE(0x6060, 0, buf8, 8, "OpMode");
          	READ(0x6061, 0, buf8, "OpMode display");
@@ -259,7 +262,6 @@ Ptarget = (struct PosOut *)(ec_slave[0].outputs);
          	ec_SDOwrite(1,0x1c13,0, TRUE, os,&ob2,EC_TIMEOUTRXM);
 
 	 	}
-
 
 //         WRITE(0x1c12, 0, buf32, 0x16010001, "rxPDO");
 //         WRITE(0x1c13, 0, buf32, 0x1A010001, "txPDO");
@@ -466,7 +468,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		{
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
-		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		//printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
 
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(target->control)
@@ -642,8 +644,10 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		{
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
-		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
-
+		//printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		motors[0].position = val->position;
+		motors[0].velocity = val->velocity;
+		motors[0].status_word = val->status;
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(target->control)
 			{
@@ -671,20 +675,95 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		/** we wait to be in ready-to-run mode and with initial value reached */
 		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
 			{
-			printf("!!!!!!!!!!!!!!!!!!!!!HERE!!!!!!!!!!!!!!!!!!!!!");
 			reachedInitial = 1;
+			printf("!!!!!!!!!!!!!!!!!!!!!HERE!!!!!!!!!!!!!!!!!!!!!");
 			}
 
-		if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+		else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
 			{
 			//target->veloc = (int32) (sin(i/100.)*(1000));
 			target->veloc = (int32) targVel;
 			}
 
-		printf("  Target: 0x%li, Control: 0x%li\n", target->veloc, target->control);
+		//printf("  Target: %li, Control: %li\n", target->veloc, target->control);
+		motors[0].target_position = 0;
+		motors[0].control_word = target->control;
 
 		printf("\r");
 		needlf = TRUE;
+                }
+             
+
+}
+
+
+/*############################################################################
+#  Title: commandRead
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: command a position.  hacked from simpletest.c
+#
+#############################################################################*/
+int commandRead()
+{
+needlf = FALSE;
+inOP = FALSE;
+uint32 buf32;
+uint16 buf16;
+uint8 buf8;
+
+//struct PosTrqVelIn *val;
+struct PosVelDioIn *val;
+struct PosOut *target;
+
+//int reachedInitial = 0;
+int timestep = 700;
+
+target = (struct PosOut *)(ec_slave[1].outputs);
+//val = (struct PosTrqVelIn *)(ec_slave[1].inputs);
+val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
+
+	/** PDO I/O refresh */
+	ec_send_processdata();
+	wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+	if(wkc >= expectedWKC)
+		{
+		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
+		//printf("  pos: %li, vel: %li, stat: %li\n", val->position, val->velocity, val->status);
+		motors[0].position = val->position;
+		motors[0].velocity = val->velocity;
+		motors[0].status_word = val->status;
+
+		/** if in fault or in the way to normal status, we update the state machine */
+		/*switch(target->control)
+			{
+			case 0:
+				target->control = 6;
+				break;
+			case 6:
+				target->control = 7;
+				break;
+			case 7:
+				target->control = 15;
+				break;
+			case 128:
+				target->control = 0;
+				break;
+			default:
+				if(val->status >> 3 & 0x01){
+					READ(0x1001, 0, buf8, "Error");
+					target->control = (128);
+					}
+				
+//                            break;
+                        }*/
+		motors[0].target_position = target->pos;
+		motors[0].control_word = target->control;
+
+
                 }
              
 
@@ -725,8 +804,11 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 	if(wkc >= expectedWKC)
 		{
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
-		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
-
+		//printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		//Populate global motors struct with received data.
+		motors[0].position = val->position;
+		motors[0].velocity = val->velocity;
+		motors[0].status_word = val->status;
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(target->control)
 			{
@@ -759,17 +841,25 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 			printf("!!!!!!!!!!HERE!!!!!!!!!\n");
 			}
 
-		//else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+		else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
 		//if((val->status & 0x0fff) == 0x0237)
-		//	{
-			target->pos = motors[0].position;
-		//	}
+			{
+			//target->pos = targPos;
+			target->pos = (int32)targPos;
+			}
 
-		printf("  Target: 0x%li, Control: 0x%li\n", target->pos, target->control);
-
+		//printf("  Target: %li, Control: %li\n", target->pos, target->control);
+		//
+		//Populate global motors struct with data to be sent to slave.
+		motors[0].target_position = target->pos;
+		motors[0].control_word = target->control;
 		printf("\r");
 		needlf = TRUE;
                 }
+		else
+		{
+			printf("Bad wkc No read or No write\n");
+		}
              
 
 }
@@ -855,4 +945,49 @@ if( inOP && ((wkc < expectedWKC) || ec_group[currentgroup].docheckstate))
         
 }
 
+
+
+int ecat_getPosition(int ax)
+{
+	return motors[0].position;
+}
+
+
+int ecat_getMotors(motordata_type* md)
+{
+	md->position = motors[0].position;
+	md->target_position = motors[0].target_position;
+	md->dio = motors[0].dio;
+	md->velocity = motors[0].velocity;
+	md->current = motors[0].current;
+	md->status_word = motors[0].status_word;
+	md->control_word = motors[0].control_word;
+
+	return 0;
+
+}
+
+
+void ecat_pprintMotors()
+{
+	printf("position: %06.2f, target: %06.2f, velocity: %07.4f, status: %i, control: %i\n", 
+		motors[0].position/COUNTS_PER_DEGREE,
+		motors[0].target_position/COUNTS_PER_DEGREE,
+		motors[0].velocity/COUNTS_PER_DEGREE, 
+		motors[0].status_word,
+		motors[0].control_word
+      	      );
+}
+
+
+
+
+void ecat_debug()
+{
+	static uint modder=0;
+	if( (modder % 10) == 0 )
+		ecat_pprintMotors();
+
+	modder++;
+}
 

@@ -11,10 +11,10 @@ LIB_PATH=./lib/qnx
 
 SIMPLE_OBJS = simple_test.o
 ECAT_STANDALONE_OBJS = ecat-standalone.o ecat-ng.o
-
+ECAT_TCS_OBJS = timerservice.o ecat-ng.o
 ###############binaries####################
 
-all: simple_test ecat-standalone
+all: clean simple_test ecat-standalone ecat-tcs 
 
 ecat_copley: $(COPLEY-OBJS)
 
@@ -24,16 +24,22 @@ simple_test: $(SIMPLE_OBJS)
 simple_test.o: simple_test.c
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c simple_test.c
 
-ecat-ng.o: ecat-ng.c
+ecat-ng.o: ecat-ng.c ecat_ng.h
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-ng.c
 
-ecat-standalone.o: ecat-standalone.c
+ecat-standalone.o: ecat-standalone.c ecat_ng.h
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-standalone.c
 
 ecat-standalone: $(ECAT_STANDALONE_OBJS)
 	$(CC) $^ -o ecat-standalone -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
 
+timerservice.o: timerservice.c
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c timerservice.c
+
+ecat-tcs: $(ECAT_TCS_OBJS)
+	$(CC) $^ -o ecat-tcs -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
+
 ###############utils#######################
 clean: \
-;rm *.o simple_test ecat-standalone
+;rm -f *.o simple_test ecat-standalone ecat-tcs
 
