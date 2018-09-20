@@ -894,10 +894,10 @@ int ecat_getMotors(motordata_type* md)
 
 void ecat_pprintMotors()
 {
-	printf("position: %i, target_position: %i, velocity: %i, status word: %i, control word: %i\n", 
-		motors[0].position,
-		motors[0].target_position,
-		motors[0].velocity, 
+	printf("position: %06.2f, target: %06.2f, velocity: %06.2f, status: %i, control: %i\n", 
+		motors[0].position/COUNTS_PER_DEGREE,
+		motors[0].target_position/COUNTS_PER_DEGREE,
+		motors[0].velocity/COUNTS_PER_DEGREE, 
 		motors[0].status_word,
 		motors[0].control_word
       	      );

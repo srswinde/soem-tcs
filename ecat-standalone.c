@@ -194,7 +194,7 @@ void test_angular_pos(char *ifname, char *pos)
 		//out = ecat_getPosition( ALT );
 		//angle = angle+3.14159*0.0001;
 		
-
+		ecat_debug();
 		usleep(1000);
 	}
 }
