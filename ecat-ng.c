@@ -609,6 +609,134 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 }
 
 /*############################################################################
+#  Title: commandDrive()
+#  Author: C. Johnson
+#  Date: 9/2/18
+#  Args:  N/A
+#  Description: command a velocity.  hacked from simpletest.c
+#
+#############################################################################*/
+int commandDrive(int newVal, char mode)
+{
+needlf = FALSE;
+inOP = FALSE;
+uint32 buf32;
+uint16 buf16;
+uint8 buf8;
+
+struct PosVelDioIn *val;
+val = (struct PosVelDioIn *)(ec_slave[1].inputs);
+
+//make a generic PDO and copy the real control word in.
+//PosOut has all required fields, so I'll use it.
+struct PosOut PDO;
+struct PosOut *target;
+if(mode==VEL_MOD){
+	struct VelocOut *tmp;
+	tmp = (struct VelocOut *)(ec_slave[1].outputs);
+	target->control = tmp->control;
+	}
+if(mode==POS_MOD){
+	struct PosOut *tmp;
+	tmp = (struct PosOut *)(ec_slave[1].outputs);
+	target->control = tmp->control;
+	}
+
+
+
+
+	/** PDO I/O refresh */
+	ec_send_processdata();
+	wkc = ec_receive_processdata(EC_TIMEOUTRET);
+
+
+	//make a generic PDO and copy the real control word in.
+	//PosOut has all required fields, so I'll use it.
+	struct PosOut PDO;
+	struct PosOut *target;
+	if(mode==VEL_MOD){
+		struct VelocOut *tmp;
+		tmp = (struct VelocOut *)(ec_slave[1].outputs);
+		target->control = tmp->control;
+		}
+	if(mode==POS_MOD){
+		struct PosOut *tmp;
+		tmp = (struct PosOut *)(ec_slave[1].outputs);
+		target->control = tmp->control;
+		}
+
+	if(wkc >= expectedWKC)
+		{
+		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
+		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
+		//printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		motors[0].position = val->position;
+		motors[0].velocity = val->velocity;
+		motors[0].status_word = val->status;
+		/** if in fault or in the way to normal status, we update the state machine */
+		switch(target->control)
+			{
+			case 0:
+				target->control = 6;
+				break;
+			case 6:
+				target->control = 7;
+				break;
+			case 7:
+				target->control = 15;
+				break;
+			case 128:
+				target->control = 0;
+				break;
+			default:
+				if(val->status >> 3 & 0x01){
+					READ(0x1001, 0, buf8, "Error");
+					target->control = 128;
+                            		}
+//                            break;
+                        }
+
+
+		/** we wait to be in ready-to-run mode and with initial value reached */
+		if(reachedInitial == 0 /*&& val->position == INITIAL_POS */&& (val->status & 0x0fff) == 0x0237)
+			{
+			reachedInitial = 1;
+			printf("!!!!!!!!!!!!!!!!!!!!!HERE!!!!!!!!!!!!!!!!!!!!!");
+			}
+
+		else if((val->status & 0x0fff) == 0x0237 && reachedInitial)
+			{
+			if(mode==VEL_MOD)
+				{
+				struct VelocOut *tmp;
+				tmp = (struct VelocOut *)(ec_slave[1].outputs);
+				tmp->veloc = (int32) newVal;
+				tmp->control = target->control;
+				motors[0].target_position = 0;
+				motors[0].target_velocity = newVal;
+				}
+			else if(mode==POS_MOD){
+				struct PosOut *tmp;
+				tmp = (struct PosOut *)(ec_slave[1].outputs);
+				tmp->position = (int32) newVal;
+				tmp->control = target->control;
+				motors[0].target_position = newVal;
+				motors[0].target_velocity = 0;
+				}
+			}
+
+		//printf("  Target: %li, Control: %li\n", target->veloc, target->control);
+		motors[0].control_word = target->control;
+
+		printf("\r");
+		needlf = TRUE;
+                }
+             
+
+}
+
+
+/*############################################################################
 #  Title: commandVel()
 #  Author: C. Johnson
 #  Date: 9/2/18
