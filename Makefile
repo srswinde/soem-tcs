@@ -24,10 +24,10 @@ simple_test: $(SIMPLE_OBJS)
 simple_test.o: simple_test.c
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c simple_test.c
 
-ecat-ng.o: ecat-ng.c
+ecat-ng.o: ecat-ng.c ecat_ng.h
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-ng.c
 
-ecat-standalone.o: ecat-standalone.c
+ecat-standalone.o: ecat-standalone.c ecat_ng.h
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-standalone.c
 
 ecat-standalone: $(ECAT_STANDALONE_OBJS)

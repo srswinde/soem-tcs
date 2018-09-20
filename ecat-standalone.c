@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <math.h>
 #include <stdint.h> /*int32_t*/
+#include <stdlib.h> /*int32_t*/
+#include "ecat_ng.h"
 
 #define VEL_MOD 0
 #define POS_MOD 1
@@ -137,7 +139,7 @@ void test_increment_pos(char *ifname)
 void test_init(char *ifname)
 {
 	int init_resp;
-	init_resp = initEcat(ifname, POS_MOD, ALT);	
+	init_resp = initEcat(ifname, POS_MOD);//, ALT);	
 
 	if( init_resp == NOK )
 	{
@@ -156,6 +158,46 @@ void test_test()
 {
 	printf("IT WORKED\n");
 }
+
+void test_angular_pos(char *ifname, char *pos)
+{
+	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
+	int init_resp;
+	init_resp = initEcat(ifname, POS_MOD);	
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+	
+	ecatErr();
+	//printf("incoming= %s\n", pos);
+	double fpos;
+        fpos = atof(pos);
+	//printf("converted to float %f\n", fpos);
+	fpos *= (double)COUNTS_PER_DEGREE;
+	//printf("converted to counts %f\n", fpos);
+	int ipos = (int)fpos;
+	int zpos;
+	zpos = ipos;//ecat_getPosition(ALT) + 500000;
+	int encpos;
+	int out=0;
+	float angle = 0.0;
+	//printf("converted to int %i\n", ipos);
+	//exit(0);
+	while (1)
+	{
+		
+		commandPos( zpos );//+ (int) 3*500000  );
+		//commandPos( -38742744  );
+		//out = ecat_getPosition( ALT );
+		//angle = angle+3.14159*0.0001;
+		
+
+		usleep(1000);
+	}
+}
+
 
 /*############################################################################
 #  Title: main
@@ -191,6 +233,9 @@ int main(int argc, char *argv[])
 		
 		else if( strcmp( argv[2], "INC_POS" ) == 0 )
 			test_increment_pos(  argv[1] );
+		
+		else if( strcmp( argv[2], "ANG_POS" ) == 0 )
+			test_angular_pos(  argv[1], argv[3] );
 
 		else
 			usage(argv);
@@ -205,5 +250,4 @@ int main(int argc, char *argv[])
    printf("End program\n");
    return (0);
 }
-
 
