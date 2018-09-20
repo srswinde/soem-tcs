@@ -14,7 +14,7 @@ ECAT_STANDALONE_OBJS = ecat-standalone.o ecat-ng.o
 ECAT_TCS_OBJS = timerservice.o ecat-ng.o
 ###############binaries####################
 
-all: clean simple_test ecat-standalone #ecat-tcs 
+all: clean simple_test ecat-standalone ecat-tcs 
 
 ecat_copley: $(COPLEY-OBJS)
 
