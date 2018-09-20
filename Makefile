@@ -9,34 +9,42 @@ LIB_PATH=./lib/qnx
 # makefile for ethercat TCS-NG Driver		#
 ################directories######################
 
-SIMPLE-OBJS = simple_test.o
-NG-OBJS = ecat_ng.o
-STANDALONE-OBJS = ecat_ng.o ecat_standalone.o
 
+SIMPLE_OBJS = simple_test.o
+ECAT_STANDALONE_OBJS = ecat-standalone.o ecat-ng.o
+ECAT_TCS_OBJS = timerservice.o ecat-ng.o
 ###############binaries####################
 
-all: simple_test ecat_standalone
+all: clean simple_test ecat-standalone ecat-tcs 
 
-ecat_ng: $(NG-OBJS)
-	$(CC) $^ -o  ecat_ng -L$(LIB_PATH) -lsoem -loshw -losal -lsocket
+ecat_copley: $(COPLEY-OBJS)
 
-ecat_ng.o: ecat_ng.c ecat_ng.h
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat_ng.c
+simple_test: $(SIMPLE_OBJS)
 
-ecat_standalone: $(STANDALONE-OBJS)
-	$(CC) $^ -o  ecat_standalone -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
 
-ecat_standalone.o: ecat_standalone.c ecat_ng.h
-	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat_standalone.c
-
-simple_test: $(SIMPLE-OBJS)
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) simple_test.c -o simple_test -lsoem -loshw -losal -lsocket
 
 simple_test.o: simple_test.c
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c simple_test.c
 
 
+ecat-ng.o: ecat-ng.c ecat_ng.h
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-ng.c
+
+ecat-standalone.o: ecat-standalone.c ecat_ng.h
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-standalone.c
+
+ecat-standalone: $(ECAT_STANDALONE_OBJS)
+	$(CC) $^ -o ecat-standalone -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
+
+timerservice.o: timerservice.c
+	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c timerservice.c
+
+ecat-tcs: $(ECAT_TCS_OBJS)
+	$(CC) $^ -o ecat-tcs -L$(LIB_PATH) -lsoem -loshw -losal -lsocket -lm
+
 ###############utils#######################
 clean: \
-;rm *.o simple_test ecat_standalone
+;rm -f *.o simple_test ecat-standalone ecat-tcs
+
 
