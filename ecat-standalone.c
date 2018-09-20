@@ -67,6 +67,7 @@ void test_sin_pos(char *ifname)
 		//out = ecat_getPosition( ALT );
 		angle = angle+3.14159*0.001;
 		usleep(500);
+		ecat_debug();
 
 	}
 	ec_close();

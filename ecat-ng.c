@@ -47,6 +47,8 @@ volatile int wkc;
 boolean inOP;
 uint8 currentgroup = 0;
 
+
+
 struct PosOut { //0x1600
     uint32 pos;
     uint32 dio;
@@ -89,9 +91,12 @@ struct PosVelDioIn {  //0x1A03
 typedef struct
 {
 int32 position;
+int32 target_position;
 uint32 dio;
 int32 velocity;
 int32 current;
+int16 status_word;
+int16 control_word;
 }motordata_type;
 
 motordata_type motors[8];
@@ -466,7 +471,7 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		{
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
 		//printf("  pos: %li, tor: %li, stat: %li, mode: %li,", val->position, val->torque, val->status, val->profile);
-		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		//printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
 
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(target->control)
@@ -727,9 +732,11 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 	if(wkc >= expectedWKC)
 		{
 		//printf("Processdata cycle %4d, WKC %d,", i, wkc);
-		printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		//printf("  pos: %li, vel: %li, stat: %li,", val->position, val->velocity, val->status);
+		//Populate global motors struct with received data.
 		motors[0].position = val->position;
 		motors[0].velocity = val->velocity;
+		motors[0].status_word = val->status;
 		/** if in fault or in the way to normal status, we update the state machine */
 		switch(target->control)
 			{
@@ -769,8 +776,11 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 			target->pos = targPos;
 		//	}
 
-		printf("  Target: %li, Control: %li\n", target->pos, target->control);
-
+		//printf("  Target: %li, Control: %li\n", target->pos, target->control);
+		//
+		//Populate global motors struct with data to be sent to slave.
+		motors[0].target_position = target->pos;
+		motors[0].control_word = target->control;
 		printf("\r");
 		needlf = TRUE;
                 }
@@ -864,5 +874,42 @@ if( inOP && ((wkc < expectedWKC) || ec_group[currentgroup].docheckstate))
 int ecat_getPosition(int ax)
 {
 	return motors[0].position;
+}
+
+
+int ecat_getMotors(motordata_type* md)
+{
+	md->position = motors[0].position;
+	md->target_position = motors[0].target_position;
+	md->dio = motors[0].dio;
+	md->velocity = motors[0].velocity;
+	md->current = motors[0].current;
+	md->status_word = motors[0].status_word;
+	md->control_word = motors[0].control_word;
+
+	return 0;
+
+}
+
+
+void ecat_pprintMotors()
+{
+	printf("position: %i, target_position: %i, velocity: %i, status word: %i, control word: %i\n", 
+		motors[0].position,
+		motors[0].target_position,
+		motors[0].velocity, 
+		motors[0].status_word,
+		motors[0].control_word
+      	      );
+}
+
+
+
+
+void ecat_debug()
+{
+	static uint modder=0;
+	if( (modder % 10) == 0 )
+		ecat_pprintMotors();
 }
 
