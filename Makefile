@@ -6,8 +6,9 @@ CC=qcc -V gcc_ntox86
 INCLUDE_PATHS=-I./include -I./include/osal -I./include/qnx
 LIB_PATH=./lib/qnx
 #################################################
-# makefile for ethercat TCS-NG Drivers		#
+# makefile for ethercat TCS-NG Driver		#
 ################directories######################
+
 
 SIMPLE_OBJS = simple_test.o
 ECAT_STANDALONE_OBJS = ecat-standalone.o ecat-ng.o
@@ -19,10 +20,13 @@ all: clean simple_test ecat-standalone ecat-tcs
 ecat_copley: $(COPLEY-OBJS)
 
 simple_test: $(SIMPLE_OBJS)
+
+
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) simple_test.c -o simple_test -lsoem -loshw -losal -lsocket
 
 simple_test.o: simple_test.c
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c simple_test.c
+
 
 ecat-ng.o: ecat-ng.c ecat_ng.h
 	$(CC) $(INCLUDE_PATHS) -L$(LIB_PATH) -c ecat-ng.c
@@ -42,4 +46,5 @@ ecat-tcs: $(ECAT_TCS_OBJS)
 ###############utils#######################
 clean: \
 ;rm -f *.o simple_test ecat-standalone ecat-tcs
+
 
