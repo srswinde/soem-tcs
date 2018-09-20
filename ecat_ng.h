@@ -2,6 +2,9 @@
 #define POS_MOD 1
 #define COUNTS_PER_DEGREE 186413.511111111
 
+#define OK 0
+#define NOK 1
+
 void init();
 extern int configure();
 int initEcat(char *, int);

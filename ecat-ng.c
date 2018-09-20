@@ -34,8 +34,6 @@
 
 
 
-#define OK 0
-#define NOK 1
 
 int reachedInitial;
 
@@ -784,6 +782,10 @@ val = (struct PosVelDioIn *)(ec_slave[1].inputs);
 		printf("\r");
 		needlf = TRUE;
                 }
+		else
+		{
+			printf("Bad wkc No read or No write\n");
+		}
              
 
 }
@@ -911,5 +913,7 @@ void ecat_debug()
 	static uint modder=0;
 	if( (modder % 10) == 0 )
 		ecat_pprintMotors();
+
+	modder++;
 }
 
