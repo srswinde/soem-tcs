@@ -149,7 +149,8 @@ void test_init(char *ifname)
 	}
 	while (1)
 	{
-		//commandRead();
+		commandRead();
+		ecat_debug();
 		usleep(700);
 	}
 
@@ -199,6 +200,39 @@ void test_angular_pos(char *ifname, char *pos)
 	}
 }
 
+void test_angular_vel(char *ifname, char *vel)
+{
+	const double ASECS2CNTS = pow(2, 26)/(360.0*3600);
+	int init_resp;
+	init_resp = initEcat(ifname, VEL_MOD);	
+	if( init_resp == NOK )
+	{
+		printf("initEcat returned NOK\n");
+		return;
+	}
+	
+	ecatErr();
+	//printf("incoming= %s\n", pos);
+	double fvel;
+        fvel = atof(vel);
+	
+	//printf("converted to float %f\n", fpos);
+	fvel *= (double)COUNTS_PER_DEGREE;
+	//printf("converted to counts %f\n", fpos);
+	int ivel = (int)fvel;
+	float angle = 0.0;
+	while (1)
+	{
+		
+		commandVel( ivel ) ;//+ (int) 3*500000  );
+		//commandPos( -38742744  );
+		//out = ecat_getPosition( ALT );
+		//angle = angle+3.14159*0.0001;
+		
+		ecat_debug();
+		usleep(1000);
+	}
+}
 
 /*############################################################################
 #  Title: main
@@ -237,6 +271,9 @@ int main(int argc, char *argv[])
 		
 		else if( strcmp( argv[2], "ANG_POS" ) == 0 )
 			test_angular_pos(  argv[1], argv[3] );
+
+		else if( strcmp( argv[2], "ANG_VEL" ) == 0 )
+			test_angular_vel(  argv[1], argv[3] );
 
 		else
 			usage(argv);
