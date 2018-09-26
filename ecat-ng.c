@@ -261,6 +261,24 @@ Ptarget = (struct PosOut *)(ec_slave[0].outputs);
 	 	os=sizeof(ob2); ob2 = 0x1a030001;
          	ec_SDOwrite(1,0x1c13,0, TRUE, os,&ob2,EC_TIMEOUTRXM);
 
+		
+         	READ(0x607b, 0, buf32, "poslim:0");
+         	READ(0x607b, 1, buf32, "poslim:1");
+         	READ(0x607b, 2, buf32, "poslim:2");
+
+
+         	READ(0x607d, 0, buf32, "swposlim:0");
+         	READ(0x607d, 1, buf32, "swposlim:1");
+         	READ(0x607d, 2, buf32, "swposlim:2");
+
+		fflush(stdout);
+               //WRITE(0x6067, 0, buf32, 67108864, "poswin");
+               //WRITE(0x6065, 0, buf32, 67108864, "followin");
+ 
+         	READ(0x6067, 0, buf32, "poswin:0");
+         	READ(0x6065, 0, buf32, "followWin:0");
+		//exit(0);
+		sleep(5);
 	 	}
 
 //         WRITE(0x1c12, 0, buf32, 0x16010001, "rxPDO");
@@ -970,7 +988,9 @@ int ecat_getMotors(motordata_type* md)
 
 void ecat_pprintMotors()
 {
-	printf("position: %06.2f, target: %06.2f, velocity: %07.4f, status: %i, control: %i\n", 
+
+	printf("position: %06.2f, target: %06.2f, velocity: %06.2f, status: 0x%x, control: %i\n", 
+
 		motors[0].position/COUNTS_PER_DEGREE,
 		motors[0].target_position/COUNTS_PER_DEGREE,
 		motors[0].velocity/COUNTS_PER_DEGREE, 
