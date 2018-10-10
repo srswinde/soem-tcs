@@ -261,6 +261,13 @@ Ptarget = (struct PosOut *)(ec_slave[0].outputs);
 	 	os=sizeof(ob2); ob2 = 0x1a030001;
          	ec_SDOwrite(1,0x1c13,0, TRUE, os,&ob2,EC_TIMEOUTRXM);
 
+		//following error
+         	WRITE(0x6065, 0, buf32, 4294967295, "following error");
+         	WRITE(0x6066, 0, buf32, 60000, "following error timeout");
+		//position window		
+         	WRITE(0x6067, 0, buf32, 200, "position window");
+         	WRITE(0x6068, 0, buf32, 50, "position window time");
+
 	 	}
 
 //         WRITE(0x1c12, 0, buf32, 0x16010001, "rxPDO");
@@ -290,8 +297,8 @@ Ptarget = (struct PosOut *)(ec_slave[0].outputs);
          WRITE(0x10F1, 2, buf32, 1, "Heartbeat");
 
 
-         WRITE(0x60c2, 1, buf8, 2, "Time period");
-         WRITE(0x2f75, 0, buf16, 2, "Interpolation timeout");
+         //WRITE(0x60c2, 1, buf8, 2, "Time period");
+         //WRITE(0x2f75, 0, buf16, 2, "Interpolation timeout");
 
          printf("Slaves mapped, state to SAFE_OP.\n");
 
