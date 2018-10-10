@@ -679,8 +679,8 @@ if(mode==POS_MOD){
 
 	//make a generic PDO and copy the real control word in.
 	//PosOut has all required fields, so I'll use it.
-	struct PosOut PDO;
-	struct PosOut *target;
+	//struct PosOut PDO;
+	//struct PosOut *target;
 	if(mode==VEL_MOD){
 		struct VelocOut *tmp;
 		tmp = (struct VelocOut *)(ec_slave[1].outputs);
@@ -740,15 +740,15 @@ if(mode==POS_MOD){
 				tmp->veloc = (int32) newVal;
 				tmp->control = target->control;
 				motors[0].target_position = 0;
-				motors[0].target_velocity = newVal;
+				//motors[0].target_velocity = newVal;
 				}
 			else if(mode==POS_MOD){
 				struct PosOut *tmp;
 				tmp = (struct PosOut *)(ec_slave[1].outputs);
-				tmp->position = (int32) newVal;
+				//tmp->position = (int32) newVal;
 				tmp->control = target->control;
 				motors[0].target_position = newVal;
-				motors[0].target_velocity = 0;
+				//motors[0].target_velocity = 0;
 				}
 			}
 
